@@ -2510,15 +2510,6 @@ protected:
  * Global Functions
  */
 
-template<typename T_numtype>
-ostream& operator<<(ostream&, const Array<T_numtype,1>&);
-
-template<typename T_numtype, int N_rank>
-ostream& operator<<(ostream&, const Array<T_numtype,N_rank>&);
-
-template<typename T_numtype, int N_rank>
-istream& operator>>(istream& is, Array<T_numtype,N_rank>& x);
-
 template <typename P_numtype,int N_rank>
 void swap(Array<P_numtype,N_rank>& a,Array<P_numtype,N_rank>& b) {
     Array<P_numtype,N_rank> c(a);
