@@ -111,6 +111,36 @@ class Array : public MemoryBlockReference<P_numtype>
 {
 
 private:
+
+    template <typename T1, typename ... Ti>
+    struct TypeIndex {
+        static const bool value = std::is_convertible<T1, int>::value && TypeIndex<Ti ...>::value;
+    };
+    template <typename T1>
+    struct TypeIndex<T1> {
+        static const bool value = std::is_convertible<T1, int>::value;
+    };
+
+    template <typename T1, typename ... Ti>
+    struct TypeRange {
+        static const bool value = std::is_same<T1, Range>::value && TypeRange<Ti ...>::value;
+    };
+    template <typename T1>
+    struct TypeRange<T1> {
+        static const bool value = std::is_same<T1, Range>::value;
+    };
+
+    template <typename T1, typename T2, typename ... Ti>
+    struct TypePart {
+        static const bool value = TypePart<T1, T2>::value || TypePart<T2, Ti ...>::value;
+    };
+    template <typename T1, typename T2>
+    struct TypePart<T1, T2> {
+        static const bool value =
+        (!std::is_same<T1, Range>::value && std::is_same<T2, Range>::value) ||
+        (!std::is_same<T2, Range>::value && std::is_same<T1, Range>::value);
+    };
+
     typedef MemoryBlockReference<P_numtype> T_base;
     using T_base::data_;
 
@@ -1469,412 +1499,38 @@ public:
     }
 
     template<int N_rank2>
-    T_numtype& restrict operator()(const TinyVector<int,N_rank2>& index) 
+    T_numtype& restrict operator()(const TinyVector<int,N_rank2>& index)
     {
         assertInRange(index);
         return data_[dot(index, stride_)];
     }
 
-    const T_numtype& restrict operator()(TinyVector<int,1> index) const
-    {
-        assertInRange(index[0]);
-        return data_[index[0] * stride_[0]];
+    //size_t is used because there is test(255,255,255,255) in 'testsuite/64bit.cpp'
+    template <typename T0, typename ... Ti>
+    size_t sum_index(int i, T0 i0, const Ti & ... ii) const {
+        return size_t(i0) * stride_[i] +
+        sum_index(i + 1, ii ...);
+    }
+    size_t sum_index(int i) const {
+        return 0;
     }
 
-    T_numtype& operator()(TinyVector<int,1> index)
-    {
-        assertInRange(index[0]);
-        return data_[index[0] * stride_[0]];
+    template <typename ... Ti,
+              typename =
+              typename std::enable_if<TypeIndex<Ti ...>::value && sizeof...(Ti) == N_rank
+              >::type>
+    const T_numtype& restrict operator()(const Ti & ... ind) const {
+        assertInRange(ind ...);
+        return data_[sum_index(0, ind ...)];
     }
 
-    const T_numtype& restrict operator()(TinyVector<int,2> index) const
-    {
-        assertInRange(index[0], index[1]);
-        return data_[index[0] * stride_[0] 
-		     + index[1] * stride_[1]];
-    }
-
-    T_numtype& operator()(TinyVector<int,2> index)
-    {
-        assertInRange(index[0], index[1]);
-        return data_[index[0] * stride_[0] 
-		     + index[1] * stride_[1]];
-    }
-
-    const T_numtype& restrict operator()(TinyVector<int,3> index) const
-    {
-        assertInRange(index[0], index[1], index[2]);
-        return data_[(index[0]) * stride_[0] 
-		     + index[1] * stride_[1]
-		     + index[2] * stride_[2]];
-    }
-
-    T_numtype& operator()(TinyVector<int,3> index)
-    {
-        assertInRange(index[0], index[1], index[2]);
-        return data_[(index[0]) * stride_[0]
-		     + index[1] * stride_[1]
-		     + index[2] * stride_[2]];
-    }
-
-    const T_numtype& restrict operator()(const TinyVector<int,4>& index) const
-    {
-        assertInRange(index[0], index[1], index[2], index[3]);
-        return data_[(index[0]) * stride_[0] 
-		     + index[1] * stride_[1]
-		     + index[2] * stride_[2] + index[3] * stride_[3]];
-    }
-
-    T_numtype& operator()(const TinyVector<int,4>& index)
-    {
-        assertInRange(index[0], index[1], index[2], index[3]);
-        return data_[(index[0]) * stride_[0] 
-		     + index[1] * stride_[1]
-		     + index[2] * stride_[2] + index[3] * stride_[3]];
-    }
-
-    const T_numtype& restrict operator()(const TinyVector<int,5>& index) const
-    {
-        assertInRange(index[0], index[1], index[2], index[3],
-            index[4]);
-        return data_[(index[0]) * stride_[0] 
-		     + index[1] * stride_[1]
-		     + index[2] * stride_[2] + index[3] * stride_[3]
-		     + index[4] * stride_[4]];
-    }
-
-    T_numtype& operator()(const TinyVector<int,5>& index)
-    {
-        assertInRange(index[0], index[1], index[2], index[3],
-            index[4]);
-        return data_[(index[0]) * stride_[0]
-		     + index[1] * stride_[1]
-		     + index[2] * stride_[2] + index[3] * stride_[3]
-		     + index[4] * stride_[4]];
-    }
-
-    const T_numtype& restrict operator()(const TinyVector<int,6>& index) const
-    {
-        assertInRange(index[0], index[1], index[2], index[3],
-            index[4], index[5]);
-        return data_[(index[0]) * stride_[0]
-		     + index[1] * stride_[1]
-		     + index[2] * stride_[2] + index[3] * stride_[3]
-		     + index[4] * stride_[4] + index[5] * stride_[5]];
-    }
-
-    T_numtype& operator()(const TinyVector<int,6>& index)
-    {
-        assertInRange(index[0], index[1], index[2], index[3],
-            index[4], index[5]);
-        return data_[(index[0]) * stride_[0]
-		     + index[1] * stride_[1]
-		     + index[2] * stride_[2] + index[3] * stride_[3]
-		     + index[4] * stride_[4] + index[5] * stride_[5]];
-    }
-
-    const T_numtype& restrict operator()(const TinyVector<int,7>& index) const
-    {
-        assertInRange(index[0], index[1], index[2], index[3],
-            index[4], index[5], index[6]);
-        return data_[(index[0]) * stride_[0] 
-		     + index[1] * stride_[1]
-		     + index[2] * stride_[2] + index[3] * stride_[3]
-		     + index[4] * stride_[4] + index[5] * stride_[5]
-		     + index[6] * stride_[6]];
-    }
-
-    T_numtype& operator()(const TinyVector<int,7>& index)
-    {
-        assertInRange(index[0], index[1], index[2], index[3],
-            index[4], index[5], index[6]);
-        return data_[(index[0]) * stride_[0] 
-		     + index[1] * stride_[1]
-		     + index[2] * stride_[2] + index[3] * stride_[3]
-		     + index[4] * stride_[4] + index[5] * stride_[5]
-		     + index[6] * stride_[6]];
-    }
-
-    const T_numtype& restrict operator()(const TinyVector<int,8>& index) const
-    {
-        assertInRange(index[0], index[1], index[2], index[3],
-            index[4], index[5], index[6], index[7]);
-        return data_[(index[0]) * stride_[0]
-		     + index[1] * stride_[1]
-		     + index[2] * stride_[2] + index[3] * stride_[3]
-		     + index[4] * stride_[4] + index[5] * stride_[5]
-		     + index[6] * stride_[6] + index[7] * stride_[7]];
-    }
-
-    T_numtype& operator()(const TinyVector<int,8>& index)
-    {
-        assertInRange(index[0], index[1], index[2], index[3],
-            index[4], index[5], index[6], index[7]);
-        return data_[(index[0]) * stride_[0] 
-		     + index[1] * stride_[1]
-		     + index[2] * stride_[2] + index[3] * stride_[3]
-		     + index[4] * stride_[4] + index[5] * stride_[5]
-		     + index[6] * stride_[6] + index[7] * stride_[7]];
-    }
-
-    const T_numtype& restrict operator()(const TinyVector<int,9>& index) const
-    {
-        assertInRange(index[0], index[1], index[2], index[3],
-            index[4], index[5], index[6], index[7], index[8]);
-        return data_[(index[0]) * stride_[0]
-		     + index[1] * stride_[1]
-		     + index[2] * stride_[2] + index[3] * stride_[3]
-		     + index[4] * stride_[4] + index[5] * stride_[5]
-		     + index[6] * stride_[6] + index[7] * stride_[7]
-		     + index[8] * stride_[8]];
-    }
-
-    T_numtype& operator()(const TinyVector<int,9>& index)
-    {
-        assertInRange(index[0], index[1], index[2], index[3],
-            index[4], index[5], index[6], index[7], index[8]);
-        return data_[(index[0]) * stride_[0]
-		     + index[1] * stride_[1]
-		     + index[2] * stride_[2] + index[3] * stride_[3]
-		     + index[4] * stride_[4] + index[5] * stride_[5]
-		     + index[6] * stride_[6] + index[7] * stride_[7]
-		     + index[8] * stride_[8]];
-    }
-
-    const T_numtype& restrict operator()(const TinyVector<int,10>& index) const
-    {
-        assertInRange(index[0], index[1], index[2], index[3],
-            index[4], index[5], index[6], index[7], index[8], index[9]);
-        return data_[(index[0]) * stride_[0]
-		     + index[1] * stride_[1]
-		     + index[2] * stride_[2] + index[3] * stride_[3]
-		     + index[4] * stride_[4] + index[5] * stride_[5]
-		     + index[6] * stride_[6] + index[7] * stride_[7]
-		     + index[8] * stride_[8] + index[9] * stride_[9]];
-    }
-
-    T_numtype& operator()(const TinyVector<int,10>& index)
-    {
-        assertInRange(index[0], index[1], index[2], index[3],
-            index[4], index[5], index[6], index[7], index[8], index[9]);
-        return data_[(index[0]) * stride_[0]
-		     + index[1] * stride_[1]
-		     + index[2] * stride_[2] + index[3] * stride_[3]
-		     + index[4] * stride_[4] + index[5] * stride_[5]
-		     + index[6] * stride_[6] + index[7] * stride_[7]
-		     + index[8] * stride_[8] + index[9] * stride_[9]];
-    }
-
-    const T_numtype& restrict operator()(const TinyVector<int,11>& index) const
-    {
-        assertInRange(index[0], index[1], index[2], index[3],
-            index[4], index[5], index[6], index[7], index[8], index[9],
-            index[10]);
-        return data_[(index[0]) * stride_[0] 
-		     + index[1] * stride_[1]
-		     + index[2] * stride_[2] + index[3] * stride_[3]
-		     + index[4] * stride_[4] + index[5] * stride_[5]
-		     + index[6] * stride_[6] + index[7] * stride_[7]
-		     + index[8] * stride_[8] + index[9] * stride_[9]
-		     + index[10] * stride_[10]];
-    }
-
-    T_numtype& operator()(const TinyVector<int,11>& index)
-    {
-        assertInRange(index[0], index[1], index[2], index[3],
-            index[4], index[5], index[6], index[7], index[8], index[9],
-            index[10]);
-        return data_[(index[0]) * stride_[0]
-		     + index[1] * stride_[1]
-		     + index[2] * stride_[2] + index[3] * stride_[3]
-		     + index[4] * stride_[4] + index[5] * stride_[5]
-		     + index[6] * stride_[6] + index[7] * stride_[7]
-		     + index[8] * stride_[8] + index[9] * stride_[9]
-		     + index[10] * stride_[10]];
-    }
-
-    const T_numtype& restrict operator()(int i0) const
-    { 
-        assertInRange(i0);
-        return data_[(i0) * stride_[0]]; 
-    }
-
-    T_numtype& restrict operator()(int i0) 
-    {
-        assertInRange(i0);
-        return data_[(i0) * stride_[0]];
-    }
-
-    const T_numtype& restrict operator()(int i0, int i1) const
-    { 
-        assertInRange(i0, i1);
-        return data_[(i0) * stride_[0] + i1 * stride_[1]];
-    }
-
-    T_numtype& restrict operator()(int i0, int i1)
-    {
-        assertInRange(i0, i1);
-        return data_[(i0) * stride_[0] + i1 * stride_[1]];
-    }
-
-    const T_numtype& restrict operator()(int i0, int i1, int i2) const
-    {
-        assertInRange(i0, i1, i2);
-        return data_[(i0) * stride_[0] + i1 * stride_[1]
-		     + i2 * stride_[2]];
-    }
-
-    T_numtype& restrict operator()(int i0, int i1, int i2) 
-    {
-        assertInRange(i0, i1, i2);
-        return data_[(i0) * stride_[0] + i1 * stride_[1]
-		     + i2 * stride_[2]];
-    }
-
-    const T_numtype& restrict operator()(int i0, int i1, int i2, int i3) const
-    {
-        assertInRange(i0, i1, i2, i3);
-        return data_[(i0) * stride_[0] + i1 * stride_[1]
-		     + i2 * stride_[2] + i3 * stride_[3]];
-    }
-
-    T_numtype& restrict operator()(int i0, int i1, int i2, int i3)
-    {
-        assertInRange(i0, i1, i2, i3);
-        return data_[(i0) * stride_[0] + i1 * stride_[1]
-		     + i2 * stride_[2] + i3 * stride_[3]];
-    }
-
-    const T_numtype& restrict operator()(int i0, int i1, int i2, int i3,
-        int i4) const
-    {
-        assertInRange(i0, i1, i2, i3, i4);
-        return data_[(i0) * stride_[0] + i1 * stride_[1]
-		     + i2 * stride_[2] + i3 * stride_[3] + i4 * stride_[4]];
-    }
-
-    T_numtype& restrict operator()(int i0, int i1, int i2, int i3,
-        int i4)
-    {
-        assertInRange(i0, i1, i2, i3, i4);
-        return data_[(i0) * stride_[0] + i1 * stride_[1]
-		     + i2 * stride_[2] + i3 * stride_[3] + i4 * stride_[4]];
-    }
-
-    const T_numtype& restrict operator()(int i0, int i1, int i2, int i3,
-        int i4, int i5) const
-    {
-        assertInRange(i0, i1, i2, i3, i4, i5);
-        return data_[(i0) * stride_[0] + i1 * stride_[1]
-		     + i2 * stride_[2] + i3 * stride_[3] + i4 * stride_[4]
-		     + i5 * stride_[5]];
-    }
-
-    T_numtype& restrict operator()(int i0, int i1, int i2, int i3,
-        int i4, int i5)
-    {
-        assertInRange(i0, i1, i2, i3, i4, i5);
-        return data_[(i0) * stride_[0] + i1 * stride_[1]
-            + i2 * stride_[2] + i3 * stride_[3] + i4 * stride_[4]
-            + i5 * stride_[5]];
-    }
-
-    const T_numtype& restrict operator()(int i0, int i1, int i2, int i3,
-        int i4, int i5, int i6) const
-    {
-        assertInRange(i0, i1, i2, i3, i4, i5, i6);
-        return data_[(i0) * stride_[0] + i1 * stride_[1]
-            + i2 * stride_[2] + i3 * stride_[3] + i4 * stride_[4]
-            + i5 * stride_[5] + i6 * stride_[6]];
-    }
-
-    T_numtype& restrict operator()(int i0, int i1, int i2, int i3,
-        int i4, int i5, int i6)
-    {
-        assertInRange(i0, i1, i2, i3, i4, i5, i6);
-        return data_[(i0) * stride_[0] + i1 * stride_[1]
-            + i2 * stride_[2] + i3 * stride_[3] + i4 * stride_[4]
-            + i5 * stride_[5] + i6 * stride_[6]];
-    }
-
-    const T_numtype& restrict operator()(int i0, int i1, int i2, int i3,
-        int i4, int i5, int i6, int i7) const
-    {
-        assertInRange(i0, i1, i2, i3, i4, i5, i6, i7);
-        return data_[(i0) * stride_[0] + i1 * stride_[1]
-            + i2 * stride_[2] + i3 * stride_[3] + i4 * stride_[4]
-            + i5 * stride_[5] + i6 * stride_[6] + i7 * stride_[7]];
-    }
-
-    T_numtype& restrict operator()(int i0, int i1, int i2, int i3,
-        int i4, int i5, int i6, int i7)
-    {
-        assertInRange(i0, i1, i2, i3, i4, i5, i6, i7);
-        return data_[(i0) * stride_[0] + i1 * stride_[1]
-            + i2 * stride_[2] + i3 * stride_[3] + i4 * stride_[4]
-            + i5 * stride_[5] + i6 * stride_[6] + i7 * stride_[7]];
-    }
-
-    const T_numtype& restrict operator()(int i0, int i1, int i2, int i3,
-        int i4, int i5, int i6, int i7, int i8) const
-    {
-        assertInRange(i0, i1, i2, i3, i4, i5, i6, i7, i8);
-        return data_[(i0) * stride_[0] + i1 * stride_[1]
-            + i2 * stride_[2] + i3 * stride_[3] + i4 * stride_[4]
-            + i5 * stride_[5] + i6 * stride_[6] + i7 * stride_[7]
-            + i8 * stride_[8]];
-    }
-
-    T_numtype& restrict operator()(int i0, int i1, int i2, int i3,
-        int i4, int i5, int i6, int i7, int i8)
-    {
-        assertInRange(i0, i1, i2, i3, i4, i5, i6, i7, i8);
-        return data_[(i0) * stride_[0] + i1 * stride_[1]
-            + i2 * stride_[2] + i3 * stride_[3] + i4 * stride_[4]
-            + i5 * stride_[5] + i6 * stride_[6] + i7 * stride_[7]
-            + i8 * stride_[8]];
-    }
-
-    const T_numtype& restrict operator()(int i0, int i1, int i2, int i3,
-        int i4, int i5, int i6, int i7, int i8, int i9) const
-    {
-        assertInRange(i0, i1, i2, i3, i4, i5, i6, i7, i8, i9);
-        return data_[(i0) * stride_[0] + i1 * stride_[1]
-            + i2 * stride_[2] + i3 * stride_[3] + i4 * stride_[4]
-            + i5 * stride_[5] + i6 * stride_[6] + i7 * stride_[7]
-            + i8 * stride_[8] + i9 * stride_[9]];
-    }
-
-    T_numtype& restrict operator()(int i0, int i1, int i2, int i3,
-        int i4, int i5, int i6, int i7, int i8, int i9)
-    {
-        assertInRange(i0, i1, i2, i3, i4, i5, i6, i7, i8, i9);
-        return data_[(i0) * stride_[0] + i1 * stride_[1]
-            + i2 * stride_[2] + i3 * stride_[3] + i4 * stride_[4]
-            + i5 * stride_[5] + i6 * stride_[6] + i7 * stride_[7]
-            + i8 * stride_[8] + i9 * stride_[9]];
-    }
-
-    const T_numtype& restrict operator()(int i0, int i1, int i2, int i3,
-        int i4, int i5, int i6, int i7, int i8, int i9, int i10) const
-    {
-        assertInRange(i0, i1, i2, i3, i4, i5, i6, i7, i8, 
-            i9, i10);
-        return data_[(i0) * stride_[0] + i1 * stride_[1]
-            + i2 * stride_[2] + i3 * stride_[3] + i4 * stride_[4]
-            + i5 * stride_[5] + i6 * stride_[6] + i7 * stride_[7]
-            + i8 * stride_[8] + i9 * stride_[9] + i10 * stride_[10]];
-    }
-
-    T_numtype& restrict operator()(int i0, int i1, int i2, int i3,
-        int i4, int i5, int i6, int i7, int i8, int i9, int i10)
-    {
-        assertInRange(i0, i1, i2, i3, i4, i5, i6, i7, i8, 
-            i9, i10);
-        return data_[(i0) * stride_[0] + i1 * stride_[1]
-            + i2 * stride_[2] + i3 * stride_[3] + i4 * stride_[4]
-            + i5 * stride_[5] + i6 * stride_[6] + i7 * stride_[7]
-            + i8 * stride_[8] + i9 * stride_[9] + i10 * stride_[10]];
+    template <typename ... Ti,
+              typename =
+              typename std::enable_if<TypeIndex<Ti ...>::value && sizeof...(Ti) == N_rank
+              >::type>
+    T_numtype& restrict operator()(const Ti & ... ind) {
+        assertInRange(ind ...);
+        return data_[sum_index(0, ind ...)];
     }
 
     /*
@@ -1882,12 +1538,12 @@ public:
      * fewer than N_rank, then missing arguments are treated like Range::all().
      */
 
-    T_array& noConst() const
-    { return const_cast<T_array&>(*this); }
-
-    T_array operator()(const RectDomain<N_rank>& subdomain) const
-    {
-        return T_array(noConst(), subdomain);
+    template <typename ... Tr,
+              typename =
+              typename std::enable_if<TypeRange<Tr ...>::value
+              >::type>
+    T_array operator()(const Tr & ... rr) const {
+        return T_array(noConst(), rr ...);
     }
 
     /* Operator added by Julian Cummings */
@@ -1896,65 +1552,14 @@ public:
         return T_array(noConst(), subdomain);
     }
 
-    T_array operator()(Range r0) const
+    T_array operator()(const RectDomain<N_rank>& subdomain) const
     {
-        return T_array(noConst(), r0);
+        return T_array(noConst(), subdomain);
     }
 
-    T_array operator()(Range r0, Range r1) const
+    T_array& noConst() const
     {
-        return T_array(noConst(), r0, r1);
-    }
-
-    T_array operator()(Range r0, Range r1, Range r2) const
-    {
-        return T_array(noConst(), r0, r1, r2);
-    }
-
-    T_array operator()(Range r0, Range r1, Range r2, Range r3) const
-    {
-        return T_array(noConst(), r0, r1, r2, r3);
-    }
-
-    T_array operator()(Range r0, Range r1, Range r2, Range r3, Range r4) const
-    {
-        return T_array(noConst(), r0, r1, r2, r3, r4);
-    }
-
-    T_array operator()(Range r0, Range r1, Range r2, Range r3, Range r4,
-        Range r5) const
-    {
-        return T_array(noConst(), r0, r1, r2, r3, r4, r5);
-    }
-
-    T_array operator()(Range r0, Range r1, Range r2, Range r3, Range r4,
-        Range r5, Range r6) const
-    {
-        return T_array(noConst(), r0, r1, r2, r3, r4, r5, r6);
-    }
-
-    T_array operator()(Range r0, Range r1, Range r2, Range r3, Range r4,
-        Range r5, Range r6, Range r7) const
-    {
-        return T_array(noConst(), r0, r1, r2, r3, r4, r5, r6, r7);
-    }
-
-    T_array operator()(Range r0, Range r1, Range r2, Range r3, Range r4,
-        Range r5, Range r6, Range r7, Range r8) const
-    {
-        return T_array(noConst(), r0, r1, r2, r3, r4, r5, r6, r7, r8);
-    }
-
-    T_array operator()(Range r0, Range r1, Range r2, Range r3, Range r4,
-        Range r5, Range r6, Range r7, Range r8, Range r9) const
-    {
-        return T_array(noConst(), r0, r1, r2, r3, r4, r5, r6, r7, r8, r9);
-    }
-
-    T_array operator()(Range r0, Range r1, Range r2, Range r3, Range r4,
-        Range r5, Range r6, Range r7, Range r8, Range r9, Range r10) const
-    {
-        return T_array(noConst(), r0, r1, r2, r3, r4, r5, r6, r7, r8, r9, r10);
+        return const_cast<T_array&>(*this);
     }
 
     // Allow any mixture of Range, int and Vector<int> objects as
@@ -1982,7 +1587,8 @@ public:
 
 #ifdef BZ_HAVE_PARTIAL_ORDERING
 
-    template<typename T1, typename T2>
+    template<typename T1, typename T2,
+        typename = typename std::enable_if<TypePart<T1, T2>::value>::type>
     typename SliceInfo<T_numtype,T1,T2>::T_slice
     operator()(T1 r1, T2 r2) const
     {
@@ -1992,7 +1598,8 @@ public:
             nilArraySection(), nilArraySection(), nilArraySection());
     }
 
-    template<typename T1, typename T2, typename T3>
+    template<typename T1, typename T2, typename T3,
+        typename = typename std::enable_if<TypePart<T1, T2, T3>::value>::type>
     typename SliceInfo<T_numtype,T1,T2,T3>::T_slice 
     operator()(T1 r1, T2 r2, T3 r3) const
     {
@@ -2002,7 +1609,8 @@ public:
             nilArraySection(), nilArraySection());
     }
 
-    template<typename T1, typename T2, typename T3, typename T4>
+    template<typename T1, typename T2, typename T3, typename T4,
+        typename = typename std::enable_if<TypePart<T1, T2, T3, T4>::value>::type>
     typename SliceInfo<T_numtype,T1,T2,T3,T4>::T_slice
     operator()(T1 r1, T2 r2, T3 r3, T4 r4) const
     {
@@ -2012,7 +1620,8 @@ public:
             nilArraySection(), nilArraySection());
     }
 
-    template<typename T1, typename T2, typename T3, typename T4, typename T5>
+    template<typename T1, typename T2, typename T3, typename T4, typename T5,
+        typename = typename std::enable_if<TypePart<T1, T2, T3, T4, T5>::value>::type>
     typename SliceInfo<T_numtype,T1,T2,T3,T4,T5>::T_slice
     operator()(T1 r1, T2 r2, T3 r3, T4 r4, T5 r5) const
     {
@@ -2022,7 +1631,8 @@ public:
             nilArraySection(), nilArraySection());
     }
 
-    template<typename T1, typename T2, typename T3, typename T4, typename T5, typename T6>
+    template<typename T1, typename T2, typename T3, typename T4, typename T5, typename T6,
+        typename = typename std::enable_if<TypePart<T1, T2, T3, T4, T5, T6>::value>::type>
     typename SliceInfo<T_numtype,T1,T2,T3,T4,T5,T6>::T_slice
     operator()(T1 r1, T2 r2, T3 r3, T4 r4, T5 r5, T6 r6) const
     {
@@ -2032,7 +1642,8 @@ public:
     }
 
     template<typename T1, typename T2, typename T3, typename T4, typename T5, typename T6,
-        typename T7>
+        typename T7,
+        typename = typename std::enable_if<TypePart<T1, T2, T3, T4, T5, T6, T7>::value>::type>
     typename SliceInfo<T_numtype,T1,T2,T3,T4,T5,T6,T7>::T_slice
     operator()(T1 r1, T2 r2, T3 r3, T4 r4, T5 r5, T6 r6, T7 r7) const
     {
@@ -2042,7 +1653,8 @@ public:
     }
 
     template<typename T1, typename T2, typename T3, typename T4, typename T5, typename T6,
-        typename T7, typename T8>
+        typename T7, typename T8,
+        typename = typename std::enable_if<TypePart<T1, T2, T3, T4, T5, T6, T7, T8>::value>::type>
     typename SliceInfo<T_numtype,T1,T2,T3,T4,T5,T6,T7,T8>::T_slice
     operator()(T1 r1, T2 r2, T3 r3, T4 r4, T5 r5, T6 r6, T7 r7, T8 r8) const
     {
@@ -2052,7 +1664,8 @@ public:
     }
 
     template<typename T1, typename T2, typename T3, typename T4, typename T5, typename T6,
-        typename T7, typename T8, typename T9>
+        typename T7, typename T8, typename T9,
+        typename = typename std::enable_if<TypePart<T1, T2, T3, T4, T5, T6, T7, T8, T9>::value>::type>
     typename SliceInfo<T_numtype,T1,T2,T3,T4,T5,T6,T7,T8,T9>::T_slice
     operator()(T1 r1, T2 r2, T3 r3, T4 r4, T5 r5, T6 r6, T7 r7, T8 r8, T9 r9) const
     {
@@ -2061,7 +1674,8 @@ public:
     }
 
     template<typename T1, typename T2, typename T3, typename T4, typename T5, typename T6,
-        typename T7, typename T8, typename T9, typename T10>
+        typename T7, typename T8, typename T9, typename T10,
+        typename = typename std::enable_if<TypePart<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10>::value>::type>
     typename SliceInfo<T_numtype,T1,T2,T3,T4,T5,T6,T7,T8,T9,T10>::T_slice
     operator()(T1 r1, T2 r2, T3 r3, T4 r4, T5 r5, T6 r6, T7 r7, T8 r8, T9 r9, T10 r10) const
     {
@@ -2070,7 +1684,8 @@ public:
     }
 
     template<typename T1, typename T2, typename T3, typename T4, typename T5, typename T6,
-        typename T7, typename T8, typename T9, typename T10, typename T11>
+        typename T7, typename T8, typename T9, typename T10, typename T11,
+        typename = typename std::enable_if<TypePart<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11>::value>::type>
     typename SliceInfo<T_numtype,T1,T2,T3,T4,T5,T6,T7,T8,T9,T10,T11>::T_slice
     operator()(T1 r1, T2 r2, T3 r3, T4 r4, T5 r5, T6 r6, T7 r7, T8 r8, T9 r9, T10 r10, T11 r11) const
     {
@@ -2517,15 +2132,6 @@ protected:
 /*
  * Global Functions
  */
-
-template<typename T_numtype>
-ostream& operator<<(ostream&, const Array<T_numtype,1>&);
-
-template<typename T_numtype, int N_rank>
-ostream& operator<<(ostream&, const Array<T_numtype,N_rank>&);
-
-template<typename T_numtype, int N_rank>
-istream& operator>>(istream& is, Array<T_numtype,N_rank>& x);
 
 template <typename P_numtype,int N_rank>
 void swap(Array<P_numtype,N_rank>& a,Array<P_numtype,N_rank>& b) {
